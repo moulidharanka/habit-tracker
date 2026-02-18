@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Habit Tracker</title>
+<style>
+body{font-family:system-ui;padding:20px;background:#0f1220;color:#e6e8ff}
+h2,h3{margin-top:24px}
+input{padding:8px;border-radius:8px;border:none;margin-right:6px}
+button{padding:6px 10px;border:none;border-radius:8px;background:#4c6fff;color:white;cursor:pointer}
+button.done{background:#22c55e}
+button.delete{background:#ef4444;margin-left:8px}
+.card{background:#181c34;padding:14px;border-radius:14px;margin:10px 0}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px}
+.day{aspect-ratio:1;border-radius:6px;background:#2a2f57;display:flex;align-items:center;justify-content:center;font-size:11px}
+.day.done{background:#22c55e}
+.small{opacity:.7;font-size:12px}
+.meta{margin-top:6px;font-size:13px;opacity:.85}
+</style>
+</head>
+<body>
+<h2>Habit Tracker</h2>
+
+<input id="name" placeholder="New habit" />
+<button onclick="addHabit()">Add</button>
+
+<div style="margin-top:10px">
+<label class="small">Reminder time:</label>
+<input type="time" id="reminderTime" />
+<button onclick="enableReminder()">Enable Reminder</button>
+<button onclick="disableReminder()">Disable</button>
+</div>
+
+<div style="margin-top:10px">
+<button onclick="exportData()">Export Backup</button>
+<input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)" />
+<button onclick="document.getElementById('importFile').click()">Import Backup</button>
+</div>
+
+<h3>Today</h3>
+<div id="stats"></div>
+<div id="list"></div>
+
+<script>
+/* LOCAL DATE SAFE KEY */
+function todayKey(date=new Date()){
+  const y=date.getFullYear();
+  const m=String(date.getMonth()+1).padStart(2,'0');
+  const d=String(date.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
+}
+
+function nextDay(date){const d=new Date(date);d.setDate(d.getDate()+1);return d;}
+function prevDay(date){const d=new Date(date);d.setDate(d.getDate()-1);return d;}
+function daysBetween(a,b){return Math.floor((b-a)/86400000);} 
+
+/* STORAGE */
+const STORAGE_KEY="habit-data-v2";
+function load(){
+  const raw=localStorage.getItem(STORAGE_KEY);
+  if(!raw) return {version:2,habits:[]};
+  const data=JSON.parse(raw);
+  if(!data.version) return migrate(data);
+  return data;
+}
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}
+function migrate(old){
+  const habits=(old||[]).map(h=>({id:h.id,name:h.name,createdAt:h.createdAt||Date.now(),completed:{}}));
+  return {version:2,habits};
+}
+let state=load();
+
+/* MODEL */
+function addHabit(){
+  const name=document.getElementById('name').value.trim();
+  if(!name) return;
+  state.habits.push({id:crypto.randomUUID(),name,createdAt:Date.now(),completed:{}});
+  document.getElementById('name').value="";
+  save();render();
+
+/* BACKUP EXPORT */
+function exportData(){
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='habit-backup.json';
+  a.click();
+}
+
+/* BACKUP IMPORT */
+function importData(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const data=JSON.parse(reader.result);
+      if(!data.habits) throw 'Invalid';
+      state=data;
+      save();
+      render();
+      alert('Backup restored');
+    }catch{
+      alert('Invalid backup file');
+    }
+  };
+  reader.readAsText(file);
+}
+}
+
+function removeHabit(id){
+  state.habits=state.habits.filter(h=>h.id!==id);
+  save();render();
+}
+
+function toggleToday(id){
+  const habit=state.habits.find(h=>h.id===id);
+  const key=todayKey();
+  if(habit.completed[key]) delete habit.completed[key]; else habit.completed[key]=true;
+  save();render();
+}
+
+/* CALC */
+function completedToday(h){return !!h.completed[todayKey()];}
+
+function streak(h){
+  let count=0;let d=new Date();
+  while(true){const key=todayKey(d);if(h.completed[key]){count++;d=prevDay(d);}else break;}
+  return count;
+}
+
+function longestStreak(h){
+  let best=0,current=0;
+  let d=new Date(h.createdAt);
+  const end=new Date();
+  while(d<=end){
+    const key=todayKey(d);
+    if(h.completed[key]){current++;best=Math.max(best,current);}else current=0;
+    d=nextDay(d);
+  }
+  return best;
+}
+
+function successRate(h){
+  const start=new Date(h.createdAt);
+  const today=new Date();
+  const totalDays=Math.max(1,daysBetween(start,today)+1);
+  const doneDays=Object.keys(h.completed).length;
+  return Math.round((doneDays/totalDays)*100);
+}
+
+function todayStats(){
+  const total=state.habits.length;
+  const done=state.habits.filter(completedToday).length;
+  return{done,total};
+}
+
+/* MONTH GRID */
+function monthGrid(h){
+  const now=new Date();
+  const y=now.getFullYear();
+  const m=now.getMonth();
+  const days=new Date(y,m+1,0).getDate();
+  const frag=document.createElement('div');frag.className='grid';
+  for(let d=1;d<=days;d++){
+    const date=new Date(y,m,d);
+    const key=todayKey(date);
+    const cell=document.createElement('div');
+    cell.className='day'+(h.completed[key]?' done':'');
+    cell.textContent=d;frag.appendChild(cell);
+  }
+  return frag;
+}
+
+/* RENDER */
+function render(){
+  const list=document.getElementById('list');list.innerHTML='';
+  state.habits.forEach(h=>{
+    const card=document.createElement('div');card.className='card';
+    const btn=document.createElement('button');btn.className=completedToday(h)?'done':'';btn.textContent=completedToday(h)?'Done':'Mark';btn.onclick=()=>toggleToday(h.id);
+    const del=document.createElement('button');del.textContent='Delete';del.className='delete';del.onclick=()=>removeHabit(h.id);
+    const title=document.createElement('div');title.innerHTML='<b>'+h.name+'</b> <span class="small">current '+streak(h)+'</span>';
+    const meta=document.createElement('div');meta.className='meta';meta.textContent=`longest ${longestStreak(h)} • success ${successRate(h)}%`;
+    card.append(btn,del,title,meta,monthGrid(h));
+    list.append(card);
+  });
+  const s=todayStats();document.getElementById('stats').textContent=`${s.done} / ${s.total} habits completed today`;
+}
+render();
+
+/* REMINDERS */
+let reminderTimer=null;
+function nextTriggerDelay(timeStr){
+  if(!timeStr) return null;
+  const [h,m]=timeStr.split(':').map(Number);
+  const now=new Date();
+  const target=new Date();
+  target.setHours(h,m,0,0);
+  if(target<=now) target.setDate(target.getDate()+1);
+  return target-now;
+}
+
+function notify(){
+  if(Notification.permission==='granted'){
+    const total=state.habits.length;
+    const done=state.habits.filter(completedToday).length;
+    new Notification('Habit Reminder',{body:`${done}/${total} habits completed today`});
+  }
+}
+
+function scheduleReminder(){
+  const time=localStorage.getItem('reminder-time');
+  const delay=nextTriggerDelay(time);
+  if(delay==null) return;
+  clearTimeout(reminderTimer);
+  reminderTimer=setTimeout(()=>{notify();scheduleReminder();},delay);
+}
+
+function enableReminder(){
+  const time=document.getElementById('reminderTime').value;
+  if(!time) return alert('Select time');
+  Notification.requestPermission().then(p=>{
+    if(p!=='granted') return alert('Permission denied');
+    localStorage.setItem('reminder-time',time);
+    scheduleReminder();
+    alert('Reminder enabled');
+  });
+}
+
+function disableReminder(){
+  localStorage.removeItem('reminder-time');
+  clearTimeout(reminderTimer);
+  alert('Reminder disabled');
+}
+
+scheduleReminder();
+</script>
+</body>
+</html>
