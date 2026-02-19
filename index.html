@@ -235,6 +235,10 @@ function disableReminder(){
 }
 
 scheduleReminder();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/habit-tracker/sw.js', { scope: '/habit-tracker/' });
+}
 </script>
 </body>
 </html>
