@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Habit Tracker</title>
+<link rel="manifest" href="/habit-tracker/manifest.json" />
+<meta name="theme-color" content="#0f1220" />
 <style>
 body{font-family:system-ui;padding:20px;background:#0f1220;color:#e6e8ff}
 h2,h3{margin-top:24px}
@@ -26,16 +28,16 @@ button.delete{background:#ef4444;margin-left:8px}
 <button onclick="addHabit()">Add</button>
 
 <div style="margin-top:10px">
-<label class="small">Reminder time:</label>
-<input type="time" id="reminderTime" />
-<button onclick="enableReminder()">Enable Reminder</button>
-<button onclick="disableReminder()">Disable</button>
+  <label class="small">Reminder time:</label>
+  <input type="time" id="reminderTime" />
+  <button onclick="enableReminder()">Enable Reminder</button>
+  <button onclick="disableReminder()">Disable</button>
 </div>
 
 <div style="margin-top:10px">
-<button onclick="exportData()">Export Backup</button>
-<input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)" />
-<button onclick="document.getElementById('importFile').click()">Import Backup</button>
+  <button onclick="exportData()">Export Backup</button>
+  <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)" />
+  <button onclick="document.getElementById('importFile').click()">Import Backup</button>
 </div>
 
 <h3>Today</h3>
@@ -53,7 +55,7 @@ function todayKey(date=new Date()){
 
 function nextDay(date){const d=new Date(date);d.setDate(d.getDate()+1);return d;}
 function prevDay(date){const d=new Date(date);d.setDate(d.getDate()-1);return d;}
-function daysBetween(a,b){return Math.floor((b-a)/86400000);} 
+function daysBetween(a,b){return Math.floor((b-a)/86400000);}
 
 /* STORAGE */
 const STORAGE_KEY="habit-data-v2";
@@ -77,7 +79,9 @@ function addHabit(){
   if(!name) return;
   state.habits.push({id:crypto.randomUUID(),name,createdAt:Date.now(),completed:{}});
   document.getElementById('name').value="";
-  save();render();
+  save();
+  render();
+} // ← fix: properly closed here
 
 /* BACKUP EXPORT */
 function exportData(){
@@ -106,7 +110,6 @@ function importData(e){
     }
   };
   reader.readAsText(file);
-}
 }
 
 function removeHabit(id){
@@ -181,7 +184,7 @@ function render(){
     const btn=document.createElement('button');btn.className=completedToday(h)?'done':'';btn.textContent=completedToday(h)?'Done':'Mark';btn.onclick=()=>toggleToday(h.id);
     const del=document.createElement('button');del.textContent='Delete';del.className='delete';del.onclick=()=>removeHabit(h.id);
     const title=document.createElement('div');title.innerHTML='<b>'+h.name+'</b> <span class="small">current '+streak(h)+'</span>';
-    const meta=document.createElement('div');meta.className='meta';meta.textContent=`longest ${longestStreak(h)} • success ${successRate(h)}%`;
+    const meta=document.createElement('div');meta.className='meta';meta.textContent=`longest ${longestStreak(h)} \u2022 success ${successRate(h)}%`; // ← fix: correct bullet char
     card.append(btn,del,title,meta,monthGrid(h));
     list.append(card);
   });
