@@ -5,7 +5,7 @@ const ASSETS = [
   "/habit-tracker/index.html",
   "/habit-tracker/manifest.json",
   "/habit-tracker/icon-192.jpeg",
-  "/habit-tracker/icon-512.png"
+  "/habit-tracker/icon-512.jpeg"
 ];
 
 self.addEventListener("install", e => {
