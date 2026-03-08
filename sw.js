@@ -4,7 +4,7 @@ const ASSETS = [
   "/habit-tracker/",
   "/habit-tracker/index.html",
   "/habit-tracker/manifest.json",
-  "/habit-tracker/icon-192.png",
+  "/habit-tracker/icon-192.jpeg",
   "/habit-tracker/icon-512.png"
 ];
 
